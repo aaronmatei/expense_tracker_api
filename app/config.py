@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_name: str = "Expense Tracker API"
     environment: str = "development"
     debug: bool = False
+    database_url: str
 
 
 settings = Settings()
