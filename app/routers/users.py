@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.crud import user as user_crud
 from app.schemas.user import UserCreate, UserPublic
 from app.database import get_db
+from app.models import User
+from app.core.deps import get_current_user
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -20,6 +22,12 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
         )
     db_user = user_crud.create_user(db, user_in)
     return db_user
+
+
+@router.get("/me", response_model=UserPublic)
+def get_current_user(current_user: User = Depends(get_current_user)):
+    """Get the currently authenticated user."""
+    return current_user
 
 
 @router.get("/{user_id}", response_model=UserPublic)
