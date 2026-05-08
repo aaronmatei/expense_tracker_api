@@ -10,6 +10,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.transaction import Transaction
 
 
 class CategoryType(enum.Enum):
@@ -33,3 +34,5 @@ class Category(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     owner: Mapped["User"] = relationship(back_populates="categories")
+    transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="category")

@@ -9,6 +9,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.category import Category
+    from app.models.transaction import Transaction
 
 
 class User(Base):
@@ -30,3 +31,5 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     categories: Mapped[list["Category"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan")
+    transactions: Mapped[list["Transaction"]
+                         ] = relationship(back_populates="owner", cascade="all, delete-orphan")
