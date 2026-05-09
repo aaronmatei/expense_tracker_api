@@ -8,6 +8,12 @@ from app.crud import category as category_crud
 from app.crud import transaction as transaction_crud
 from app.database import get_db
 from app.models import User
+
+from app.schemas.summary import (
+    CategorySummary,
+    MonthSummary,
+    TransactionSummary,
+)
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionPublic,
@@ -59,6 +65,49 @@ def create_transaction(
 ):
     _verify_category_ownership(db, transaction_in.category_id, current_user.id)
     return transaction_crud.create_transaction(db, transaction_in, current_user.id)
+
+
+@router.get("/summary", response_model=TransactionSummary)
+def get_summary(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be on or before end_date",
+        )
+    return transaction_crud.get_summary(
+        db, current_user.id, start_date, end_date
+    )
+
+
+@router.get("/summary/by-category", response_model=list[CategorySummary])
+def get_summary_by_category(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date must be on or before end_date",
+        )
+    return transaction_crud.get_summary_by_category(
+        db, current_user.id, start_date, end_date
+    )
+
+
+@router.get("/summary/by-month", response_model=list[MonthSummary])
+def get_summary_by_month(
+    year: int = Query(..., ge=2000, le=2100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return transaction_crud.get_summary_by_month(db, current_user.id, year)
 
 
 @router.get("/{transaction_id}", response_model=TransactionPublic)
