@@ -9,6 +9,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.budget import Budget
     from app.models.user import User
     from app.models.transaction import Transaction
 
@@ -35,4 +36,8 @@ class Category(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     owner: Mapped["User"] = relationship(back_populates="categories")
     transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="category")
+        back_populates="category", cascade="all, delete-orphan"
+    )
+    budgets: Mapped[list["Budget"]] = relationship(
+        back_populates="category", cascade="all, delete-orphan"
+    )

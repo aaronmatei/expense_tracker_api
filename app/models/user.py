@@ -8,6 +8,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.budget import Budget
     from app.models.category import Category
     from app.models.transaction import Transaction
 
@@ -33,3 +34,6 @@ class User(Base):
         back_populates="owner", cascade="all, delete-orphan")
     transactions: Mapped[list["Transaction"]
                          ] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    budgets: Mapped[list["Budget"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
