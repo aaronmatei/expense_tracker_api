@@ -2,10 +2,11 @@ from fastapi import APIRouter, HTTPException, Depends, status as Status
 from sqlalchemy.orm import Session
 
 from app.crud import user as user_crud
-from app.schemas.user import UserCreate, UserPublic
+from app.schemas.user import UserCreate, UserPublic, UserUpdate, ChangePasswordRequest
 from app.database import get_db
 from app.models import User
 from app.core.deps import get_current_user
+from app.core.security import verify_password
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -28,6 +29,26 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
 def get_current_user(current_user: User = Depends(get_current_user)):
     """Get the currently authenticated user."""
     return current_user
+
+
+@router.patch("/me", response_model=UserPublic)
+def update_current_user(
+    user_in: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return user_crud.update_user(db, current_user, user_in)
+
+
+@router.post("/me/password", status_code=Status.HTTP_204_NO_CONTENT)
+def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=Status.HTTP_400_BAD_REQUEST, detail="Incorrect current password")
+    user_crud.change_password(db, current_user, body.new_password)
 
 
 @router.get("/{user_id}", response_model=UserPublic)

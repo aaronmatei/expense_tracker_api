@@ -15,6 +15,18 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
 
 
+class UserUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+    phone_number: str | None = Field(default=None, max_length=20)
+    id_number: str | None = Field(default=None, max_length=10)
+    address: str | None = Field(default=None, max_length=255)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class UserPublic(UserBase):
     """What the API returns. Never includes the password or its hash."""
     id: int
