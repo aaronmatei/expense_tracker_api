@@ -1,12 +1,37 @@
 from datetime import date
 from decimal import Decimal
 
+from fastapi import HTTPException
 from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Category, Transaction
+from app.models.account import Account, AccountType
 from app.models.category import CategoryType
 from app.schemas.transaction import TransactionCreate, TransactionUpdate
+
+STRICT_BALANCE_TYPES = {
+    AccountType.CHECKING,
+    AccountType.SAVINGS,
+    AccountType.CASH,
+    AccountType.INVESTMENT,
+    AccountType.OTHER,
+}
+
+
+def _signed_delta(amount: Decimal, category: Category) -> Decimal:
+    return amount if category.type == CategoryType.INCOME else -amount
+
+
+def _assert_balance_ok(account: Account, delta: Decimal) -> None:
+    if (
+        account.account_type in STRICT_BALANCE_TYPES
+        and account.current_balance + delta < 0
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transaction would push {account.name} below zero",
+        )
 
 
 def list_transactions(
@@ -15,6 +40,7 @@ def list_transactions(
     skip: int = 0,
     limit: int = 50,
     category_id: int | None = None,
+    account_id: int | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> list[Transaction]:
@@ -22,6 +48,8 @@ def list_transactions(
 
     if category_id is not None:
         stmt = stmt.where(Transaction.category_id == category_id)
+    if account_id is not None:
+        stmt = stmt.where(Transaction.account_id == account_id)
     if start_date is not None:
         stmt = stmt.where(Transaction.transaction_date >= start_date)
     if end_date is not None:
@@ -51,8 +79,13 @@ def get_transaction(
 def create_transaction(
     db: Session, transaction_in: TransactionCreate, user_id: int
 ) -> Transaction:
+    category = db.get(Category, transaction_in.category_id)
+    account = db.get(Account, transaction_in.account_id)
+    delta = _signed_delta(transaction_in.amount, category)
+    _assert_balance_ok(account, delta)
     transaction = Transaction(**transaction_in.model_dump(), user_id=user_id)
     db.add(transaction)
+    account.current_balance += delta
     db.commit()
     db.refresh(transaction)
     return transaction
@@ -64,14 +97,35 @@ def update_transaction(
     transaction_in: TransactionUpdate,
 ) -> Transaction:
     update_data = transaction_in.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(transaction, field, value)
+    if update_data.keys() & {"amount", "account_id", "category_id"}:
+        old_category = db.get(Category, transaction.category_id)
+        old_account = db.get(Account, transaction.account_id)
+        old_delta = _signed_delta(transaction.amount, old_category)
+        old_account.current_balance -= old_delta
+        for field, value in update_data.items():
+            setattr(transaction, field, value)
+        new_category = db.get(Category, transaction.category_id)
+        new_account = db.get(Account, transaction.account_id)
+        new_delta = _signed_delta(transaction.amount, new_category)
+        try:
+            _assert_balance_ok(new_account, new_delta)
+        except HTTPException:
+            old_account.current_balance += old_delta
+            raise
+        new_account.current_balance += new_delta
+    else:
+        for field, value in update_data.items():
+            setattr(transaction, field, value)
     db.commit()
     db.refresh(transaction)
     return transaction
 
 
 def delete_transaction(db: Session, transaction: Transaction) -> None:
+    category = db.get(Category, transaction.category_id)
+    account = db.get(Account, transaction.account_id)
+    delta = _signed_delta(transaction.amount, category)
+    account.current_balance -= delta
     db.delete(transaction)
     db.commit()
 

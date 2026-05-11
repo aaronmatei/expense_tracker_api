@@ -94,41 +94,56 @@ def seed(db) -> dict:
             cat_map[cat_def["name"]] = cat
             counts["categories"] += 1
 
+        acc_map: dict[str, Account] = {}
         for name, atype, lo, hi in [
             ("Main Checking", AccountType.CHECKING,     1500,  5000),
             ("Savings",       AccountType.SAVINGS,      3000, 15000),
             ("Credit Card",   AccountType.CREDIT_CARD, -1200,  -200),
         ]:
-            db.add(Account(
+            acc = Account(
                 name=name,
                 account_type=atype,
                 current_balance=rand_decimal(lo, hi),
                 currency="USD",
                 user_id=user.id,
-            ))
+            )
+            db.add(acc)
+            acc_map[name] = acc
             counts["accounts"] += 1
+        db.flush()
 
-        def add_tx(amount: Decimal, desc: str, tx_date: date, cat_name: str) -> None:
+        def add_tx(amount: Decimal, desc: str, tx_date: date, cat_name: str, acc_name: str) -> None:
+            cat = cat_map[cat_name]
+            acc = acc_map[acc_name]
             db.add(Transaction(
                 amount=amount,
                 description=desc,
                 transaction_date=tx_date,
-                category_id=cat_map[cat_name].id,
+                category_id=cat.id,
+                account_id=acc.id,
                 user_id=user.id,
             ))
+            if cat.type == CategoryType.INCOME:
+                acc.current_balance += amount
+            else:
+                acc.current_balance -= amount
             counts["transactions"] += 1
 
-        add_tx(rand_decimal(4000, 6000), "Monthly salary", random_date(prev_start, prev_end),      "Salary")
-        add_tx(rand_decimal(4000, 6000), "Monthly salary", random_date(first_of_month, today),     "Salary")
+        add_tx(rand_decimal(4000, 6000), "Monthly salary", random_date(prev_start, prev_end), "Salary", "Main Checking")
+        add_tx(rand_decimal(4000, 6000), "Monthly salary", random_date(first_of_month, today), "Salary", "Main Checking")
 
         for _ in range(random.randint(2, 3)):
-            add_tx(rand_decimal(30, 200),  "Grocery shopping", random_date(last_30, today), "Groceries")
+            acc_name = random.choice(["Main Checking", "Credit Card"])
+            add_tx(rand_decimal(30, 200), "Grocery shopping", random_date(last_30, today), "Groceries", acc_name)
 
         for _ in range(random.randint(1, 2)):
-            add_tx(rand_decimal(10, 80),   "Transport",        random_date(last_30, today), "Transport")
+            acc_name = random.choice(["Main Checking", "Credit Card"])
+            add_tx(rand_decimal(10, 80), "Transport", random_date(last_30, today), "Transport", acc_name)
 
-        add_tx(rand_decimal(15, 60),   "Entertainment",    random_date(last_30, today), "Entertainment")
-        add_tx(rand_decimal(80, 200),  "Utilities bill",   random_date(last_30, today), "Utilities")
+        acc_name = random.choice(["Main Checking", "Credit Card"])
+        add_tx(rand_decimal(15, 60), "Entertainment", random_date(last_30, today), "Entertainment", acc_name)
+
+        add_tx(rand_decimal(80, 200), "Utilities bill", random_date(last_30, today), "Utilities", "Main Checking")
 
         for cat_name, lo, hi in [
             ("Groceries",     400, 700),

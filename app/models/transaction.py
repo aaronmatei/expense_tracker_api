@@ -9,6 +9,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.account import Account
     from app.models.category import Category
     from app.models.user import User
 
@@ -22,6 +23,8 @@ class Transaction(Base):
     transaction_date: Mapped[date] = mapped_column(Date, index=True)
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id"), index=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -34,3 +37,4 @@ class Transaction(Base):
 
     owner: Mapped["User"] = relationship(back_populates="transactions")
     category: Mapped["Category"] = relationship(back_populates="transactions")
+    account: Mapped["Account"] = relationship(back_populates="transactions")

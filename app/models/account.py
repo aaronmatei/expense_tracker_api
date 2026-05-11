@@ -10,6 +10,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.transaction import Transaction
     from app.models.user import User
 
 
@@ -45,3 +46,6 @@ class Account(Base):
     )
 
     owner: Mapped["User"] = relationship(back_populates="accounts")
+    transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="account"
+    )

@@ -9,6 +9,7 @@ class TransactionBase(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     transaction_date: date
     category_id: int
+    account_id: int
 
 
 class TransactionCreate(TransactionBase):
@@ -22,6 +23,7 @@ class TransactionUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     transaction_date: date | None = None
     category_id: int | None = None
+    account_id: int | None = None
 
 
 class TransactionPublic(TransactionBase):

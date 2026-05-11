@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
 from app.crud import account as account_crud
+from app.models.transaction import Transaction
 from app.database import get_db
 from app.models import User
 from app.schemas.account import (
@@ -74,4 +76,12 @@ def delete_account(
     account = account_crud.get_account(db, account_id, current_user.id)
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    tx_count = db.scalar(
+        select(func.count(Transaction.id)).where(Transaction.account_id == account_id)
+    )
+    if tx_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete an account with existing transactions",
+        )
     account_crud.delete_account(db, account)
