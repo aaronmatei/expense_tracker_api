@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.account import Account
     from app.models.category import Category
     from app.models.employee import Employee
+    from app.models.recurring_transaction import RecurringTransaction
     from app.models.user import User
 
 
@@ -30,6 +31,11 @@ class Transaction(Base):
     employee_id: Mapped[int | None] = mapped_column(
         ForeignKey("employees.id"), nullable=True, index=True
     )
+    recurring_transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recurring_transactions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -43,3 +49,6 @@ class Transaction(Base):
     category: Mapped["Category"] = relationship(back_populates="transactions")
     account: Mapped["Account"] = relationship(back_populates="transactions")
     employee: Mapped["Employee | None"] = relationship(back_populates="transactions")
+    recurring_transaction: Mapped["RecurringTransaction | None"] = relationship(
+        back_populates="transactions"
+    )

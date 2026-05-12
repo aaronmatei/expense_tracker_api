@@ -1,6 +1,15 @@
 import enum
 
 
+class RecurringFrequency(str, enum.Enum):
+    daily = "daily"
+    weekly = "weekly"
+    biweekly = "biweekly"
+    monthly = "monthly"
+    quarterly = "quarterly"
+    yearly = "yearly"
+
+
 class Gender(str, enum.Enum):
     male = "male"
     female = "female"

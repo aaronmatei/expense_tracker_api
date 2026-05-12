@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.models import employee  # noqa: F401
-from app.routers import accounts, auth, budgets, categories, employees, transactions, users
+from app.models import recurring_transaction  # noqa: F401
+from app.models import transfer  # noqa: F401
+from app.routers import accounts, auth, budgets, categories, employees, recurring_transactions, transactions, transfers, users
 
 app = FastAPI(title=settings.app_name, debug=settings.debug)
 
@@ -22,6 +24,8 @@ app.include_router(transactions.router)
 app.include_router(budgets.router)
 app.include_router(accounts.router)
 app.include_router(employees.router)
+app.include_router(recurring_transactions.router)
+app.include_router(transfers.router)
 
 
 @app.get("/")

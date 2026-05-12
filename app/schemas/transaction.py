@@ -45,6 +45,7 @@ class TransactionPublic(TransactionBase):
     user_id: int
     employee_id: int | None = None
     employee: EmployeeBrief | None = None
+    recurring_transaction_id: int | None = None
     created_at: datetime
     updated_at: datetime
 

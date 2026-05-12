@@ -12,7 +12,9 @@ if TYPE_CHECKING:
     from app.models.budget import Budget
     from app.models.category import Category
     from app.models.employee import Employee
+    from app.models.recurring_transaction import RecurringTransaction
     from app.models.transaction import Transaction
+    from app.models.transfer import Transfer
 
 
 class User(Base):
@@ -43,5 +45,11 @@ class User(Base):
         back_populates="owner", cascade="all, delete-orphan"
     )
     employees: Mapped[list["Employee"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+    transfers: Mapped[list["Transfer"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+    recurring_transactions: Mapped[list["RecurringTransaction"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan"
     )

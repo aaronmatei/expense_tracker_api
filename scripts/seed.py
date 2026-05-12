@@ -15,6 +15,8 @@ from app.models.transaction import Transaction
 from app.models.budget import Budget, BudgetPeriod
 from app.models.employee import Employee
 from app.models.enums import EmploymentType, PayFrequency
+from app.models.recurring_transaction import RecurringTransaction
+from app.models.transfer import Transfer
 from app.core.security import hash_password
 
 
@@ -33,6 +35,7 @@ CATEGORIES_DEF = [
     {"name": "Entertainment", "type": CategoryType.EXPENSE, "icon": "🎬", "color": "#ec4899"},
     {"name": "Utilities",     "type": CategoryType.EXPENSE, "icon": "⚡", "color": "#f97316"},
     {"name": "Payroll",       "type": CategoryType.EXPENSE, "icon": "💼", "color": "#8b5cf6"},
+    {"name": "Housing",       "type": CategoryType.EXPENSE, "icon": "🏠", "color": "#64748b"},
 ]
 
 EMPLOYEE_TEMPLATES = [
@@ -95,7 +98,9 @@ def months_ago(n: int, today: date) -> date:
 
 
 def wipe(db) -> None:
+    db.query(Transfer).delete()
     db.query(Transaction).delete()
+    db.query(RecurringTransaction).delete()
     db.query(Employee).delete()
     db.query(Budget).delete()
     db.query(Account).delete()
@@ -122,6 +127,7 @@ def seed(db) -> dict:
     counts = {
         "users": 0, "categories": 0, "accounts": 0,
         "transactions": 0, "budgets": 0, "employees": 0,
+        "recurring_transactions": 0, "transfers": 0,
     }
 
     for user_idx, user_data in enumerate(USERS):
@@ -242,6 +248,66 @@ def seed(db) -> dict:
             db.add(emp)
             counts["employees"] += 1
 
+        # Recurring templates — 2 per user, both monthly, no last_generated_date so they're due
+        from app.models.category import CategoryType as _CT
+        from app.models.enums import RecurringFrequency
+        for tmpl_def in [
+            {
+                "description": "Rent",
+                "amount": Decimal("25000.00"),
+                "transaction_type": _CT.EXPENSE,
+                "category": "Housing",
+                "frequency": RecurringFrequency.monthly,
+                "day_config": {"day": 1},
+                "start_date_offset_months": 6,
+            },
+            {
+                "description": "Netflix subscription",
+                "amount": Decimal("1100.00"),
+                "transaction_type": _CT.EXPENSE,
+                "category": "Entertainment",
+                "frequency": RecurringFrequency.monthly,
+                "day_config": {"day": 15},
+                "start_date_offset_months": 3,
+            },
+        ]:
+            rt = RecurringTransaction(
+                user_id=user.id,
+                description=tmpl_def["description"],
+                amount=tmpl_def["amount"],
+                transaction_type=tmpl_def["transaction_type"],
+                category_id=cat_map[tmpl_def["category"]].id,
+                account_id=acc_map["Main Checking"].id,
+                frequency=tmpl_def["frequency"],
+                day_config=tmpl_def["day_config"],
+                start_date=months_ago(tmpl_def["start_date_offset_months"], today),
+                is_active=True,
+                occurrences_count=0,
+                last_generated_date=None,
+            )
+            db.add(rt)
+            counts["recurring_transactions"] += 1
+
+        # Transfers — 2 per user from Main Checking → Savings
+        for days_ago, amount, desc in [
+            (30, Decimal("5000.00"), "Monthly savings transfer"),
+            (15, Decimal("10000.00"), "Extra savings"),
+        ]:
+            from_acc = acc_map["Main Checking"]
+            to_acc = acc_map["Savings"]
+            transfer = Transfer(
+                user_id=user.id,
+                from_account_id=from_acc.id,
+                to_account_id=to_acc.id,
+                amount=amount,
+                transfer_date=today - timedelta(days=days_ago),
+                description=desc,
+            )
+            db.add(transfer)
+            from_acc.current_balance -= amount
+            to_acc.current_balance += amount
+            counts["transfers"] += 1
+
     db.commit()
     return counts
 
@@ -270,6 +336,8 @@ def main() -> None:
         print(f"  ~{counts['transactions']} transactions  (exact count varies)")
         print(f"  {counts['budgets']} budgets")
         print(f"  {counts['employees']} employees")
+        print(f"  {counts['recurring_transactions']} recurring transactions")
+        print(f"  {counts['transfers']} transfers")
         print()
         print("Sign in with any of:")
         for u in USERS:

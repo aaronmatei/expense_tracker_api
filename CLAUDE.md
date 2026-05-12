@@ -101,3 +101,58 @@ All computed pay dates are weekend-adjusted: Saturday → Friday, Sunday → Mon
 ### Seed note
 
 The seeded category is named **"Payroll"** (not "Employees"). This rename only applies to fresh seed data — existing user data is not auto-migrated.
+
+## Recurring Transactions
+
+Templates that materialize into real transactions on demand. No background jobs — the user clicks "Generate" from a due-payments inbox.
+
+### due-inbox pattern
+
+- `GET /recurring-transactions/due` returns all active templates where `is_template_due(template, today)` is True.
+- Materialization is manual: `POST /recurring-transactions/{id}/materialize` or `/materialize-bulk`.
+- After materialization, `occurrences_count` is incremented and `last_generated_date` is set — the template won't appear as due again until the next occurrence date.
+
+### day_config shapes per frequency
+
+| `frequency`  | Required shape |
+|--------------|----------------|
+| `daily`      | `{}` (empty dict) |
+| `weekly`     | `{"weekday": "monday"\|…\|"sunday"}` |
+| `biweekly`   | `{"weekday": "...", "anchor_date": "YYYY-MM-DD"}` — anchor establishes the 14-day cycle (extends in both directions) |
+| `monthly`    | `{"day": 1–31}` — values > days-in-month clamp to last day |
+| `quarterly`  | `{"month_offset": 0–2, "day": 1–31}` — offset 0 = Jan/Apr/Jul/Oct, 1 = Feb/May/Aug/Nov, 2 = Mar/Jun/Sep/Dec |
+| `yearly`     | `{"month": 1–12, "day": 1–31}` |
+
+### Weekend adjustment
+
+All computed dates go through `apply_weekend_adjustment` from `app/services/payroll.py` — Saturday → Friday, Sunday → Monday. Consistent with payroll.
+
+### Materialize endpoint
+
+`POST /{id}/materialize` uses `_assert_balance_ok` and `_signed_delta` from `app/crud/transaction.py` directly (same as payroll), so the account balance check and update fire correctly. It does NOT call `create_transaction` (which commits internally) — instead it stages the Transaction object, updates the balance, sets `recurring_transaction_id`, increments counters, and commits once.
+
+### Bulk materialize
+
+`POST /materialize-bulk` wraps each item in `db.begin_nested()` (savepoint). One failure does not roll back the whole batch. Response: `{successful: [TransactionPublic], failed: [{recurring_transaction_id, error}]}`.
+
+### Template deletion
+
+`DELETE /{id}` always succeeds. Transactions previously materialized from the template keep all their data; their `recurring_transaction_id` is set to NULL by SQLAlchemy (Python-level SET NULL since SQLite doesn't enforce FK constraints). The FK also carries `ondelete="SET NULL"` for correctness on Postgres.
+
+### Exhaustion rules
+
+A template is exhausted (returns 400 on materialize) when ANY of:
+- `is_active == False`
+- `max_occurrences` is set and `occurrences_count >= max_occurrences`
+- `end_date` is set and `compute_next_due_date` returns None (next occurrence would be after end_date)
+
+## Transfers
+
+`POST /transfers`, `GET /transfers`, `GET /transfers/{id}`, `PATCH /transfers/{id}`, `DELETE /transfers/{id}`.
+
+- Model has two FKs to `accounts.id` (`from_account_id`, `to_account_id`); each relationship needs `foreign_keys=[...]` because SQLAlchemy can't infer which FK to use.
+- Same-currency rule enforced in CRUD: raises 400 with "Cannot transfer between accounts of different currencies".
+- Balance updates reuse `STRICT_BALANCE_TYPES` from `app/crud/transaction.py`; strict-type accounts can't overdraw.
+- Update operation: reverse old balances first (using old account IDs), apply field changes, then apply new balances (using new account IDs). SQLAlchemy's identity map ensures in-session objects are updated correctly when accounts overlap.
+- Delete reverses both account balances before removing the row.
+- `TransferRead` includes `from_account_name` and `to_account_name`; populated via `_to_read()` helper in the router after eager-loading both relationships with `joinedload`.
