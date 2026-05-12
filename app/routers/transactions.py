@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.crud import account as account_crud
 from app.crud import category as category_crud
+from app.crud import employees as employee_crud
 from app.crud import transaction as transaction_crud
 from app.database import get_db
 from app.models import User
@@ -42,6 +43,22 @@ def _verify_account_ownership(db: Session, account_id: int, user_id: int) -> Non
         )
 
 
+def _verify_employee_ownership(db: Session, employee_id: int, user_id: int) -> None:
+    """Ensure the employee exists AND belongs to the current user."""
+    from sqlalchemy import select
+    from app.models.employee import Employee
+    emp = db.scalar(
+        select(Employee).where(
+            Employee.id == employee_id, Employee.user_id == user_id
+        )
+    )
+    if emp is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Employee not found or does not belong to you",
+        )
+
+
 @router.get("", response_model=list[TransactionPublic])
 def list_transactions(
     skip: int = Query(default=0, ge=0),
@@ -50,6 +67,7 @@ def list_transactions(
     account_id: int | None = Query(default=None),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    employee_id: int | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -62,6 +80,7 @@ def list_transactions(
         account_id=account_id,
         start_date=start_date,
         end_date=end_date,
+        employee_id=employee_id,
     )
 
 
@@ -77,6 +96,8 @@ def create_transaction(
 ):
     _verify_category_ownership(db, transaction_in.category_id, current_user.id)
     _verify_account_ownership(db, transaction_in.account_id, current_user.id)
+    if transaction_in.employee_id is not None:
+        _verify_employee_ownership(db, transaction_in.employee_id, current_user.id)
     return transaction_crud.create_transaction(db, transaction_in, current_user.id)
 
 
@@ -159,6 +180,8 @@ def update_transaction(
         _verify_category_ownership(db, transaction_in.category_id, current_user.id)
     if transaction_in.account_id is not None:
         _verify_account_ownership(db, transaction_in.account_id, current_user.id)
+    if transaction_in.employee_id is not None:
+        _verify_employee_ownership(db, transaction_in.employee_id, current_user.id)
     return transaction_crud.update_transaction(db, transaction, transaction_in)
 
 

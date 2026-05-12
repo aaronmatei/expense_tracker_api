@@ -1,7 +1,20 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+
+class EmployeeBrief(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
 
 
 class TransactionBase(BaseModel):
@@ -13,7 +26,7 @@ class TransactionBase(BaseModel):
 
 
 class TransactionCreate(TransactionBase):
-    pass
+    employee_id: int | None = None
 
 
 class TransactionUpdate(BaseModel):
@@ -24,12 +37,14 @@ class TransactionUpdate(BaseModel):
     transaction_date: date | None = None
     category_id: int | None = None
     account_id: int | None = None
+    employee_id: int | None = None
 
 
 class TransactionPublic(TransactionBase):
     id: int
     user_id: int
     employee_id: int | None = None
+    employee: EmployeeBrief | None = None
     created_at: datetime
     updated_at: datetime
 

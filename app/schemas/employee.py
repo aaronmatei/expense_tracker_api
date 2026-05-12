@@ -168,6 +168,17 @@ class EmployeeRead(EmployeeBase):
         from app.services.payroll import is_due_for_pay
         return is_due_for_pay(self, date.today())
 
+    @computed_field
+    @property
+    def most_recent_pay_date(self) -> date | None:
+        from app.services.payroll import get_most_recent_pay_date
+        try:
+            return get_most_recent_pay_date(
+                date.today(), self.pay_frequency, self.pay_day_config, self.start_date
+            )
+        except Exception:
+            return None
+
 
 # ---------------------------------------------------------------------------
 # Payroll request / response schemas

@@ -43,6 +43,7 @@ def list_transactions(
     account_id: int | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    employee_id: int | None = None,
 ) -> list[Transaction]:
     stmt = select(Transaction).where(Transaction.user_id == user_id)
 
@@ -54,6 +55,8 @@ def list_transactions(
         stmt = stmt.where(Transaction.transaction_date >= start_date)
     if end_date is not None:
         stmt = stmt.where(Transaction.transaction_date <= end_date)
+    if employee_id is not None:
+        stmt = stmt.where(Transaction.employee_id == employee_id)
 
     stmt = (
         stmt.order_by(Transaction.transaction_date.desc(),
