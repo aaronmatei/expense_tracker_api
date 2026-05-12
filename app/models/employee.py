@@ -66,7 +66,7 @@ class Employee(Base):
     bank_branch: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Payroll
-    pay_amount: Mapped[Decimal] = mapped_column(Numeric(precision=12, scale=2))
+    pay_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     pay_frequency: Mapped[PayFrequency] = mapped_column(
         Enum(PayFrequency), default=PayFrequency.semi_monthly
     )

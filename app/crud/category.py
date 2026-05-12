@@ -30,13 +30,17 @@ def create_category(db: Session, category_in: CategoryCreate, user_id: int) -> C
     return db_category
 
 
-def update_category(db: Session, category: Category, category_in: CategoryUpdate) -> Category:
-    update_category = category_in.model_dump(exclude_unset=True)
-    for key, value in update_category.items():
+def update_category(
+    db: Session,
+    category: Category,
+    category_in: CategoryUpdate,
+) -> Category:
+    update_data = category_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(category, key, value)
     db.commit()
-    db.refresh(update_category)
-    return update_category
+    db.refresh(category)
+    return category
 
 
 def delete_category(db: Session, category: Category) -> None:

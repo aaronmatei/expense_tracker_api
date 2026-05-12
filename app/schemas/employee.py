@@ -37,7 +37,7 @@ class EmployeeBase(BaseModel):
     bank_account_number: str | None = Field(default=None, max_length=50)
     bank_branch: str | None = Field(default=None, max_length=100)
 
-    pay_amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    pay_amount: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
     pay_frequency: PayFrequency = PayFrequency.semi_monthly
     pay_day_config: dict
     default_account_id: int | None = None
@@ -124,8 +124,7 @@ class EmployeeUpdate(BaseModel):
     bank_account_number: str | None = Field(default=None, max_length=50)
     bank_branch: str | None = Field(default=None, max_length=100)
 
-    pay_amount: Decimal | None = Field(
-        default=None, gt=0, max_digits=12, decimal_places=2)
+    pay_amount: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
     pay_frequency: PayFrequency | None = None
     pay_day_config: dict | None = None
     default_account_id: int | None = None

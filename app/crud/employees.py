@@ -83,7 +83,13 @@ def _stage_employee_payment(
     today = date.today()
     full_name = f"{employee.first_name} {employee.last_name}"
 
-    amount: Decimal = payload.amount if payload.amount is not None else employee.pay_amount
+    amount_resolved: Decimal | None = payload.amount if payload.amount is not None else employee.pay_amount
+    if amount_resolved is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Amount is required — this employee has no default pay amount.",
+        )
+    amount: Decimal = amount_resolved
     account_id: int | None = payload.account_id if payload.account_id is not None else employee.default_account_id
     category_id: int | None = payload.category_id if payload.category_id is not None else employee.default_category_id
     transaction_date: date = payload.transaction_date if payload.transaction_date is not None else today
