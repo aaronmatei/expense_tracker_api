@@ -144,6 +144,60 @@ def get_summary_by_month(
     return transaction_crud.get_summary_by_month(db, current_user.id, year)
 
 
+@router.get("/export")
+def export_transactions_csv(
+    category_ids: list[int] | None = Query(default=None),
+    account_id: int | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    employee_id: int | None = Query(default=None),
+    type: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    rows = transaction_crud.list_transactions_for_export(
+        db=db,
+        user_id=current_user.id,
+        category_ids=category_ids,
+        account_id=account_id,
+        start_date=start_date,
+        end_date=end_date,
+        employee_id=employee_id,
+        transaction_type=type,
+    )
+
+    def generate():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["Date", "Description", "Amount", "Type", "Category", "Account", "Employee", "Recurring"])
+        yield buf.getvalue()
+        for tx in rows:
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow([
+                tx.transaction_date.isoformat(),
+                tx.description or "",
+                str(tx.amount),
+                tx.category.type.value if tx.category else "",
+                tx.category.name if tx.category else "",
+                tx.account.name if tx.account else "",
+                f"{tx.employee.first_name} {tx.employee.last_name}" if tx.employee else "",
+                "Yes" if tx.recurring_transaction_id else "No",
+            ])
+            yield buf.getvalue()
+
+    filename = f"transactions_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{transaction_id}", response_model=TransactionPublic)
 def get_transaction(
     transaction_id: int,

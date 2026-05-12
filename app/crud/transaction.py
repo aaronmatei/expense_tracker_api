@@ -34,6 +34,49 @@ def _assert_balance_ok(account: Account, delta: Decimal) -> None:
         )
 
 
+def list_transactions_for_export(
+    db: Session,
+    user_id: int,
+    category_ids: list[int] | None = None,
+    account_id: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    employee_id: int | None = None,
+    transaction_type: str | None = None,
+) -> list[Transaction]:
+    from sqlalchemy.orm import joinedload
+    stmt = (
+        select(Transaction)
+        .options(
+            joinedload(Transaction.category),
+            joinedload(Transaction.account),
+            joinedload(Transaction.employee),
+        )
+        .where(Transaction.user_id == user_id)
+    )
+    if category_ids:
+        stmt = stmt.where(Transaction.category_id.in_(category_ids))
+    if account_id is not None:
+        stmt = stmt.where(Transaction.account_id == account_id)
+    if start_date is not None:
+        stmt = stmt.where(Transaction.transaction_date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(Transaction.transaction_date <= end_date)
+    if employee_id is not None:
+        stmt = stmt.where(Transaction.employee_id == employee_id)
+    if transaction_type and transaction_type != "all":
+        type_val = CategoryType.INCOME if transaction_type == "income" else CategoryType.EXPENSE
+        stmt = stmt.where(
+            Transaction.category_id.in_(
+                select(Category.id).where(Category.type == type_val)
+            )
+        )
+    stmt = stmt.order_by(
+        Transaction.transaction_date.desc(), Transaction.id.desc()
+    )
+    return list(db.scalars(stmt).unique())
+
+
 def list_transactions(
     db: Session,
     user_id: int,
