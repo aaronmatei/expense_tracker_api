@@ -39,15 +39,15 @@ def list_transactions(
     user_id: int,
     skip: int = 0,
     limit: int = 50,
-    category_id: int | None = None,
+    category_ids: list[int] | None = None,
     account_id: int | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> list[Transaction]:
     stmt = select(Transaction).where(Transaction.user_id == user_id)
 
-    if category_id is not None:
-        stmt = stmt.where(Transaction.category_id == category_id)
+    if category_ids:
+        stmt = stmt.where(Transaction.category_id.in_(category_ids))
     if account_id is not None:
         stmt = stmt.where(Transaction.account_id == account_id)
     if start_date is not None:

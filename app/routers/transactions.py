@@ -46,7 +46,7 @@ def _verify_account_ownership(db: Session, account_id: int, user_id: int) -> Non
 def list_transactions(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    category_id: int | None = Query(default=None),
+    category_ids: list[int] | None = Query(default=None),
     account_id: int | None = Query(default=None),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
@@ -58,7 +58,7 @@ def list_transactions(
         user_id=current_user.id,
         skip=skip,
         limit=limit,
-        category_id=category_id,
+        category_ids=category_ids,
         account_id=account_id,
         start_date=start_date,
         end_date=end_date,
