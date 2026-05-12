@@ -29,6 +29,7 @@ class TransactionUpdate(BaseModel):
 class TransactionPublic(TransactionBase):
     id: int
     user_id: int
+    employee_id: int | None = None
     created_at: datetime
     updated_at: datetime
 

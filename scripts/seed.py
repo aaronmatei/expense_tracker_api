@@ -13,6 +13,8 @@ from app.models.category import Category, CategoryType
 from app.models.account import Account, AccountType
 from app.models.transaction import Transaction
 from app.models.budget import Budget, BudgetPeriod
+from app.models.employee import Employee
+from app.models.enums import EmploymentType, PayFrequency
 from app.core.security import hash_password
 
 
@@ -30,7 +32,44 @@ CATEGORIES_DEF = [
     {"name": "Transport",     "type": CategoryType.EXPENSE, "icon": "🚌", "color": "#6366f1"},
     {"name": "Entertainment", "type": CategoryType.EXPENSE, "icon": "🎬", "color": "#ec4899"},
     {"name": "Utilities",     "type": CategoryType.EXPENSE, "icon": "⚡", "color": "#f97316"},
+    {"name": "Payroll",       "type": CategoryType.EXPENSE, "icon": "💼", "color": "#8b5cf6"},
 ]
+
+EMPLOYEE_TEMPLATES = [
+    {
+        "first_name": "Brian", "last_name": "Otieno",
+        "employment_type": EmploymentType.permanent,
+        "pay_amount": Decimal("50000.00"),
+        "pay_frequency": PayFrequency.semi_monthly,
+        "pay_day_config": {"days": [15, "last"]},
+        "start_date_offset_months": 6,
+        "position": "Senior Developer",
+        "kra_pin": "A123456789P",
+        "national_id": "12345678",
+        "nhif_number": "23456789",
+        "nssf_number": "34567890",
+        "bank_name": "Equity Bank",
+        "bank_account_number": "123456789012",
+    },
+    {
+        "first_name": "Faith", "last_name": "Wanjiru",
+        "employment_type": EmploymentType.contract,
+        "pay_amount": Decimal("30000.00"),
+        "pay_frequency": PayFrequency.monthly,
+        "pay_day_config": {"day": 25},
+        "start_date_offset_months": 3,
+        "position": "Designer",
+        "kra_pin": "A987654321Q",
+        "national_id": "87654321",
+        "nhif_number": "76543210",
+        "nssf_number": "65432109",
+        "bank_name": "KCB",
+        "bank_account_number": "210987654321",
+    },
+]
+
+# Alternate bank names for variety across users
+_BANKS = ["Equity Bank", "KCB", "NCBA", "Co-op Bank"]
 
 PASSWORD = "password123"
 
@@ -43,11 +82,24 @@ def random_date(start: date, end: date) -> date:
     return start + timedelta(days=random.randint(0, max(0, (end - start).days)))
 
 
+def months_ago(n: int, today: date) -> date:
+    month = today.month - n
+    year = today.year
+    while month <= 0:
+        month += 12
+        year -= 1
+    # Clamp to valid day (e.g. Jan 31 minus 1 month → Jan 31 not valid in Feb)
+    import calendar
+    last = calendar.monthrange(year, month)[1]
+    return date(year, month, min(today.day, last))
+
+
 def wipe(db) -> None:
     db.query(Transaction).delete()
+    db.query(Employee).delete()
     db.query(Budget).delete()
-    db.query(Category).delete()
     db.query(Account).delete()
+    db.query(Category).delete()
     db.query(User).delete()
     db.commit()
     print("Existing data wiped.")
@@ -67,9 +119,12 @@ def seed(db) -> dict:
     last_30 = today - timedelta(days=30)
 
     hashed_pw = hash_password(PASSWORD)
-    counts = {"users": 0, "categories": 0, "accounts": 0, "transactions": 0, "budgets": 0}
+    counts = {
+        "users": 0, "categories": 0, "accounts": 0,
+        "transactions": 0, "budgets": 0, "employees": 0,
+    }
 
-    for user_data in USERS:
+    for user_idx, user_data in enumerate(USERS):
         user = User(
             email=user_data["email"],
             full_name=user_data["full_name"],
@@ -96,15 +151,15 @@ def seed(db) -> dict:
 
         acc_map: dict[str, Account] = {}
         for name, atype, lo, hi in [
-            ("Main Checking", AccountType.CHECKING,     1500,  5000),
-            ("Savings",       AccountType.SAVINGS,      3000, 15000),
-            ("Credit Card",   AccountType.CREDIT_CARD, -1200,  -200),
+            ("Main Checking", AccountType.CHECKING,     150000,  500000),
+            ("Savings",       AccountType.SAVINGS,      200000, 1000000),
+            ("Credit Card",   AccountType.CREDIT_CARD, -50000,   -5000),
         ]:
             acc = Account(
                 name=name,
                 account_type=atype,
                 current_balance=rand_decimal(lo, hi),
-                currency="USD",
+                currency="KES",
                 user_id=user.id,
             )
             db.add(acc)
@@ -129,26 +184,26 @@ def seed(db) -> dict:
                 acc.current_balance -= amount
             counts["transactions"] += 1
 
-        add_tx(rand_decimal(4000, 6000), "Monthly salary", random_date(prev_start, prev_end), "Salary", "Main Checking")
-        add_tx(rand_decimal(4000, 6000), "Monthly salary", random_date(first_of_month, today), "Salary", "Main Checking")
+        add_tx(rand_decimal(80000, 120000), "Monthly salary", random_date(prev_start, prev_end), "Salary", "Main Checking")
+        add_tx(rand_decimal(80000, 120000), "Monthly salary", random_date(first_of_month, today), "Salary", "Main Checking")
 
         for _ in range(random.randint(2, 3)):
             acc_name = random.choice(["Main Checking", "Credit Card"])
-            add_tx(rand_decimal(30, 200), "Grocery shopping", random_date(last_30, today), "Groceries", acc_name)
+            add_tx(rand_decimal(500, 3000), "Grocery shopping", random_date(last_30, today), "Groceries", acc_name)
 
         for _ in range(random.randint(1, 2)):
             acc_name = random.choice(["Main Checking", "Credit Card"])
-            add_tx(rand_decimal(10, 80), "Transport", random_date(last_30, today), "Transport", acc_name)
+            add_tx(rand_decimal(200, 1500), "Transport", random_date(last_30, today), "Transport", acc_name)
 
         acc_name = random.choice(["Main Checking", "Credit Card"])
-        add_tx(rand_decimal(15, 60), "Entertainment", random_date(last_30, today), "Entertainment", acc_name)
+        add_tx(rand_decimal(300, 2000), "Entertainment", random_date(last_30, today), "Entertainment", acc_name)
 
-        add_tx(rand_decimal(80, 200), "Utilities bill", random_date(last_30, today), "Utilities", "Main Checking")
+        add_tx(rand_decimal(2000, 8000), "Utilities bill", random_date(last_30, today), "Utilities", "Main Checking")
 
         for cat_name, lo, hi in [
-            ("Groceries",     400, 700),
-            ("Entertainment", 100, 200),
-            ("Transport",     150, 300),
+            ("Groceries",     8000,  15000),
+            ("Entertainment", 3000,   7000),
+            ("Transport",     4000,  10000),
         ]:
             db.add(Budget(
                 amount=rand_decimal(lo, hi),
@@ -158,6 +213,34 @@ def seed(db) -> dict:
                 user_id=user.id,
             ))
             counts["budgets"] += 1
+
+        # Employees — 2 per user, no transactions seeded (test Mark Paid flow)
+        for tmpl in EMPLOYEE_TEMPLATES:
+            start_date = months_ago(tmpl["start_date_offset_months"], today)
+            bank = _BANKS[(user_idx + EMPLOYEE_TEMPLATES.index(tmpl)) % len(_BANKS)]
+            emp = Employee(
+                user_id=user.id,
+                first_name=tmpl["first_name"],
+                last_name=tmpl["last_name"],
+                employment_type=tmpl["employment_type"],
+                pay_amount=tmpl["pay_amount"],
+                pay_frequency=tmpl["pay_frequency"],
+                pay_day_config=tmpl["pay_day_config"],
+                start_date=start_date,
+                position=tmpl["position"],
+                kra_pin=tmpl["kra_pin"],
+                national_id=tmpl["national_id"],
+                nhif_number=tmpl["nhif_number"],
+                nssf_number=tmpl["nssf_number"],
+                bank_name=bank,
+                bank_account_number=tmpl["bank_account_number"],
+                default_account_id=acc_map["Main Checking"].id,
+                default_category_id=cat_map["Payroll"].id,
+                last_paid_date=None,
+                is_active=True,
+            )
+            db.add(emp)
+            counts["employees"] += 1
 
     db.commit()
     return counts
@@ -186,6 +269,7 @@ def main() -> None:
         print(f"  {counts['accounts']} accounts")
         print(f"  ~{counts['transactions']} transactions  (exact count varies)")
         print(f"  {counts['budgets']} budgets")
+        print(f"  {counts['employees']} employees")
         print()
         print("Sign in with any of:")
         for u in USERS:

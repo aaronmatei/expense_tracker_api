@@ -11,6 +11,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.account import Account
     from app.models.category import Category
+    from app.models.employee import Employee
     from app.models.user import User
 
 
@@ -26,6 +27,9 @@ class Transaction(Base):
     account_id: Mapped[int] = mapped_column(
         ForeignKey("accounts.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    employee_id: Mapped[int | None] = mapped_column(
+        ForeignKey("employees.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -38,3 +42,4 @@ class Transaction(Base):
     owner: Mapped["User"] = relationship(back_populates="transactions")
     category: Mapped["Category"] = relationship(back_populates="transactions")
     account: Mapped["Account"] = relationship(back_populates="transactions")
+    employee: Mapped["Employee | None"] = relationship(back_populates="transactions")

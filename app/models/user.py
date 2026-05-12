@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.account import Account
     from app.models.budget import Budget
     from app.models.category import Category
+    from app.models.employee import Employee
     from app.models.transaction import Transaction
 
 
@@ -39,5 +40,8 @@ class User(Base):
         back_populates="owner", cascade="all, delete-orphan"
     )
     accounts: Mapped[list["Account"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+    employees: Mapped[list["Employee"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan"
     )

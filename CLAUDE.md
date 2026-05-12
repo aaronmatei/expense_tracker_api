@@ -66,4 +66,38 @@ FastAPI backend for a personal expense-tracking app. REST API consumed by a sepa
 
 ## Already implemented
 
-User (with JWT auth and `/auth/login`, `/users/me`), Category (income/expense), Transaction (with date filtering and summary endpoints at `/transactions/summary`, `/summary/by-category`, `/summary/by-month`), CORS configured.
+User (with JWT auth and `/auth/login`, `/users/me`), Category (income/expense), Transaction (with date filtering and summary endpoints at `/transactions/summary`, `/summary/by-category`, `/summary/by-month`), CORS configured, Employee (full CRUD + payroll scheduling).
+
+## Payroll
+
+### pay_day_config shapes (stored as JSON)
+
+| `pay_frequency`  | Required shape |
+|------------------|----------------|
+| `monthly`        | `{"day": 1–31}` — values > 28 clamp to last day of short months |
+| `semi_monthly`   | `{"days": [v1, v2]}` — each value is int 1–31 or the string `"last"` |
+| `weekly`         | `{"weekday": "monday"\|…\|"sunday"}` |
+| `biweekly`       | `{"weekday": "monday"\|…", "anchor_date": "YYYY-MM-DD"}` — anchor establishes the 14-day cycle |
+
+All computed pay dates are weekend-adjusted: Saturday → Friday, Sunday → Monday.
+
+### Pay date helpers — `app/services/payroll.py`
+
+- `compute_pay_dates_for_month(year, month, frequency, config)` — all adjusted dates in a month
+- `get_most_recent_pay_date(today, frequency, config, start_date)` — most recent date ≤ today ≥ start_date
+- `get_next_pay_date(after, frequency, config, start_date)` — next date strictly after `after`
+- `is_due_for_pay(employee, today)` — True if a pay date has passed since `last_paid_date` (or `start_date` if never paid)
+
+### Delete rule
+
+`DELETE /employees/{id}` returns **409 Conflict** if any transactions reference that employee. Use `PATCH /employees/{id}` with `{"is_active": false}` to deactivate instead.
+
+### Bulk pay — `POST /employees/pay-bulk`
+
+- Each payment is wrapped in a savepoint (`db.begin_nested()`).
+- One failure does **not** roll back the whole batch — only that payment's savepoint is rolled back.
+- Response shape: `{ "successful": [TransactionPublic], "failed": [{"employee_id": int, "error": str}] }`.
+
+### Seed note
+
+The seeded category is named **"Payroll"** (not "Employees"). This rename only applies to fresh seed data — existing user data is not auto-migrated.
